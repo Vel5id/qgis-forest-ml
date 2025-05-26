@@ -1,157 +1,65 @@
-qgis-forest-ml
+Overview
+This repository contains the full implementation of the methods described in the manuscript:
 
-Automated pipeline for detecting and counting birch seedlings in high-resolution forest mosaics.
+"Automated Detection of Birch Seedlings on Orthophotos Using Random Forest with Texture-Based Feature Engineering"
+Vladimir Fominov et al., 2025 [add more authors]
 
-📖 Overview
+The project provides reproducible code for training, validation, and evaluation of Random Forest classifiers applied to UAV-derived RGB orthomosaics for seedling density estimation and vegetation mapping in post-fire boreal forests. Both the basic (spectral/morphological) and advanced (texture-based) models are included.
 
-This repository provides scripts to:
+Features
+Data preprocessing and augmentation (spatial transforms, noise, brightness, and color jitter)
+Feature extraction:
+Base Model: Mean RGB, Excess Green (ExG), Excess Red (ExR), ExG–ExR
+Modified Model: GLCM (gray-level co-occurrence matrix) statistics and Local Binary Patterns (LBP)
+Random Forest model training with flexible hyperparameters (class weights, number of trees, etc.)
+Out-of-bag (OOB) error analysis and hyperparameter optimization
+Evaluation scripts for comparison with manual ground-truthing and visualization (heatmaps, confusion matrices, detection counts)
+Jupyter notebooks and Python scripts for reproducible experiments
 
-Train Random Forest models on multispectral TIFF datasets (RGB, textures, etc.) for multi-class and binary classification.
+Getting Started:
+Requirements:
+Python 3.10+
+numpy, pandas, scikit-learn, scikit-image, rasterio, tqdm, matplotlib, etc.
 
-Predict classes on large mosaic TIFFs by processing them in patches (64×64 px), with optional CPU thermal management.
+Install dependencies with:
+pip install -r requirements.txt
+Data
+Orthomosaic images and manual annotations (polygon masks) are required.
 
-Generate GeoTIFF outputs: full class maps and binary birch masks.
+Example data and pre-trained models are available at Kaggle Collection.
+https://www.kaggle.com/work/collections/15977795
 
-Count connected clusters of birch seedlings and export summary reports in Excel.
+Repository Contents
+train_multiclass_base.py
+Training of the base Random Forest model using spectral features (RGB and vegetation indices).
+Output: model, quality metrics, OOB-error visualization.
 
-🚀 Features
+train_multiclass_modified.py
+Training of the modified Random Forest model with an extended set of features (GLCM, LBP).
+Output: model, quality comparison, analysis of the influence of the number of trees.
 
-Patch-based inference: splits large images into configurable patches and strides.
+labels_fo_augmented.py
+Script for generating a CSV table with class labels for all images required for model training and validation.
 
-Parallel processing: utilizes ~80% of CPU cores via ProcessPoolExecutor.
+augment_images.py
+Image augmentation: spatial transformations, noise addition, brightness/color modification. Used to expand the training dataset.
 
-Thermal throttling: monitors CPU temperature and automatically pauses if overheating.
+full_script_base.py
+A complete script that runs the pipeline: orthophoto processing, prediction with the base model, creation of a heatmap, and exporting results to Excel.
 
-Multi-class & Binary modes:
+full_script_modified.py
+A script similar to the previous one, but uses the modified model and extended feature set.
 
-Multiclass: detect birch vs. other landcover types.
 
-Binary: detect birch (1) vs. non‑birch (2).
 
-Cluster analysis: downsample binary mask to patch-grid, label connected components, count single vs multi-patch clusters.
+Citation
+If you use this code or data in your research, please cite:
+Fominov V., et al. (2025) [add more authors]. Automated Detection of Birch Seedlings on Orthophotos Using Random Forest with Texture-Based Feature Engineering. [Journal, under review].
+License
 
-Error estimation: leverage out‑of‑bag (OOB) score for model error probability.
+This project is licensed under the MIT License.
+See the LICENSE file for details.
 
-Excel reporting: save cluster counts and error probabilities to .xlsx.
-
-📦 Requirements
-
-Python 3.8+
-
-rasterio
-
-numpy
-
-pandas
-
-scipy
-
-scikit-learn
-
-joblib
-
-psutil
-
-tqdm
-
-skimage (for texture-based training)
-
-Install via:
-
-pip install rasterio numpy pandas scipy scikit-learn joblib psutil tqdm scikit-image
-
-📂 Repository Structure
-
-qgis-forest-ml/
-├── README.md
-├── full_script.py          # Multiclass inference + cluster counting pipeline
-├── binary_birch_script.py  # Binary (birch vs non-birch) inference pipeline
-├── train_rgb.py            # Train RF on RGB features (multiclass)
-├── train_texture.py        # Train RF on RGB+texture features
-├── labels_multiclass_all_aug.csv  # Example labels CSV for training
-└── models/
-    ├── rf_multiclass_...pkl
-    └── rf_binary_birch_...pkl
-
-⚙️ Usage
-
-1. Inference (Multiclass)
-
-Place your mosaic TIFF at mosaic_path inside full_script.py.
-
-Ensure model_path points to your multiclass RF model .pkl.
-
-Adjust parameters (patch_size, stride, block_size, thermal thresholds).
-
-Run:
-
-python full_script.py
-
-Outputs:
-
-class_map.tif — full-class raster (uint8 labels).
-
-birch_mask.tif — binary birch mask (1/0).
-
-birch_report.xlsx — cluster counts & error probability.
-
-2. Inference (Binary Birch vs Non-Birch)
-
-Configure paths in binary_birch_script.py (mosaic_path, model_path).
-
-Adjust parameters as needed.
-
-Run:
-
-python binary_birch_script.py
-
-Outputs:
-
-class_map_binary.tif — binary-class raster (1: birch, 2: non-birch).
-
-birch_mask_binary.tif — birch mask (1/0).
-
-3. Training Scripts
-
-train_rgb.py: train a RandomForest on color features.
-
-train_texture.py: train a RandomForest with color + Haralick + LBP features.
-
-Usage example:
-
-python train_rgb.py
-python train_texture.py
-
-Ensure your labels_multiclass_all_aug.csv is populated with filepath,class,weight.
-
-📋 Configuration
-
-Patch size: patch_size (default: 64)
-
-Stride: stride (default: 64)
-
-Block size: block_size (default: 100)
-
-CPU throttle: temp_threshold, cool_factor
-
-Edit these parameters at the top of each script.
-
-💡 Recommendations
-
-Use Git LFS for large .tif and .pkl files.
-
-Store raw imagery and models in GitHub Releases if >100 MB.
-
-Reference outputs in QGIS by adding the GeoTIFFs as layers.
-
-🤝 Contributing
-
-Fork the repository
-
-Create a feature branch
-
-Commit changes
-
-Push and open a Pull Request
-
-Please follow PEP8 and include tests when applicable.
+Contact
+For questions, suggestions, or contributions, please open an issue or contact the author at:
+Vladimir Fominov — GitHub Profile, [add more]
