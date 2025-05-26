@@ -16,7 +16,7 @@ Evaluation scripts for comparison with manual ground-truthing and visualization 
 Jupyter notebooks and Python scripts for reproducible experiments
 
 Getting Started:
-Requirements:
+[Requirements]:
 Python 3.10+
 numpy, pandas, scikit-learn, scikit-image, rasterio, tqdm, matplotlib, etc.
 
