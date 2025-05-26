@@ -1,12 +1,11 @@
-Overview
+[Overview]
 This repository contains the full implementation of the methods described in the manuscript:
-
 "Automated Detection of Birch Seedlings on Orthophotos Using Random Forest with Texture-Based Feature Engineering"
 Vladimir Fominov et al., 2025 [add more authors]
 
 The project provides reproducible code for training, validation, and evaluation of Random Forest classifiers applied to UAV-derived RGB orthomosaics for seedling density estimation and vegetation mapping in post-fire boreal forests. Both the basic (spectral/morphological) and advanced (texture-based) models are included.
 
-Features
+[Features]
 Data preprocessing and augmentation (spatial transforms, noise, brightness, and color jitter)
 Feature extraction:
 Base Model: Mean RGB, Excess Green (ExG), Excess Red (ExR), ExG–ExR
@@ -23,13 +22,13 @@ numpy, pandas, scikit-learn, scikit-image, rasterio, tqdm, matplotlib, etc.
 
 Install dependencies with:
 pip install -r requirements.txt
-Data
+[Data]
 Orthomosaic images and manual annotations (polygon masks) are required.
 
-Example data and pre-trained models are available at Kaggle Collection.
+Example data and pre-trained models are available at [Kaggle Collection].
 https://www.kaggle.com/work/collections/15977795
 
-Repository Contents
+[Repository Contents]
 train_multiclass_base.py
 Training of the base Random Forest model using spectral features (RGB and vegetation indices).
 Output: model, quality metrics, OOB-error visualization.
@@ -52,14 +51,18 @@ A script similar to the previous one, but uses the modified model and extended f
 
 
 
-Citation
+
+
+[Citation]
+
 If you use this code or data in your research, please cite:
 Fominov V., et al. (2025) [add more authors]. Automated Detection of Birch Seedlings on Orthophotos Using Random Forest with Texture-Based Feature Engineering. [Journal, under review].
-License
 
+
+[Licens]
 This project is licensed under the MIT License.
 See the LICENSE file for details.
 
-Contact
+[Contact]
 For questions, suggestions, or contributions, please open an issue or contact the author at:
 Vladimir Fominov — GitHub Profile, [add more]
