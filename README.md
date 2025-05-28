@@ -66,5 +66,5 @@ This project (Code) is licensed under the MIT License.
 See the LICENSE file for details.
 
 [Contact]
-For questions, suggestions, or contributions, please open an issue or contact the author at:
+For questions, suggestions, or contributions, about code please open an issue or contact the author at:
 Vladimir Fominov — GitHub Profile, [add more]
