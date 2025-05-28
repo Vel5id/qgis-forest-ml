@@ -58,7 +58,7 @@ A script similar to the previous one, but uses the modified model and extended f
 [Citation]
 
 If you use this code or data in your research, please cite:
-Vadim C., Aliya Y. et al. (2025)  Study of the possibilities of using unmanned aerial vehicles and machine learning for assessing green mass and undergrowth in Amankaragaisky pine forest. [Journal, under review].
+Vadim C. et al. (2025)  Study of the possibilities of using unmanned aerial vehicles and machine learning for assessing green mass and undergrowth in Amankaragaisky pine forest. [Journal, under review].
 
 
 [Licens]
