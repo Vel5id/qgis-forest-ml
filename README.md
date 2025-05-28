@@ -67,4 +67,4 @@ See the LICENSE file for details.
 
 [Contact]
 For questions, suggestions, or contributions, about code please open an issue or contact the author at:
-Vladimir Fominov — GitHub Profile, [add more]
+Vladimir Fominov — GitHub Profile or Orcid
