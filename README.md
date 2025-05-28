@@ -46,6 +46,7 @@ Image augmentation: spatial transformations, noise addition, brightness/color mo
 
 full_script_base.py
 A complete script that runs the pipeline: orthophoto processing, prediction with the base model, creation of a heatmap, and exporting results to Excel.
+In full script u will find all discription to code on english
 
 full_script_modified.py
 A script similar to the previous one, but uses the modified model and extended feature set.
