@@ -17,11 +17,12 @@ Jupyter notebooks and Python scripts for reproducible experiments
 
 Getting Started:
 [Requirements]:
-Python 3.10+
+Python 3.10+. You should use Anaconda lib-manager - https://www.anaconda.com/
 numpy, pandas, scikit-learn, scikit-image, rasterio, tqdm, matplotlib, etc.
 
 Install dependencies with:
 pip install -r requirements.txt
+conda install -r requirements.txt
 [Data]
 Orthomosaic images and manual annotations (polygon masks) are required.
 
