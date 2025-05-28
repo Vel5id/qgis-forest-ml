@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 import os
 import pandas as pd
 import numpy as np
@@ -22,36 +19,36 @@ from sklearn.metrics import (
 )
 from tqdm import tqdm
 
-# новые импорты для текстурных признаков
+# new imports for texture features
 from skimage.feature import graycomatrix, graycoprops, local_binary_pattern
 
-# --- Параметры ------------------------------------------------------------
+# --- Parameters ------------------------------------------------------------
 LABELS_CSV   = "labels_multiclass_all.csv"
 BASE_DIR     = Path("../Images/new_ver")
 RANDOM_SEED  = 42
 N_TREES      = 300
 
-# число уровней квантования для GLCM и LBP
+# number of quantization levels for GLCM and LBP
 LEVELS = 8
 # -------------------------------------------------------------------------
 memory = Memory(location="cache_dir", verbose=0)
 
 def extract_features(path: str) -> list[float]:
-    """Извлекает цветовые, Haralick (GLCM) и LBP-признаки из 3-канального TIFF."""
-    # читаем патч
+    """Extract color, Haralick (GLCM), and LBP features from a 3-channel TIFF."""
+    # read the patch
     with rasterio.open(path) as src:
         img = src.read().astype(float)  # shape = (3, H, W)
     R, G, B = img[0], img[1], img[2]
 
-    # 1) Цветовые признаки
+    # 1) Spectral/color features
     mR, mG, mB = R.mean(), G.mean(), B.mean()
     exg  = (2 * G - R - B).mean()
     exr  = (1.4 * R - G).mean()
     exgr = exg - exr
     feats = [mR, mG, mB, exg, exr, exgr]
 
-    # 2) Haralick (GLCM) по G-каналу
-    # квантование до 0..LEVELS-1
+    # 2) Haralick (GLCM) on the green channel
+    # quantize to 0..LEVELS-1
     patchG = (G * (LEVELS - 1) / (G.max() + 1e-6)).astype(np.uint8)
     glcm = graycomatrix(
         patchG,
@@ -61,20 +58,18 @@ def extract_features(path: str) -> list[float]:
         symmetric=True,
         normed=True
     )
-    # усредняем по всем дистанциям и углам
+    # average over all distances and angles
     for prop in ('contrast', 'correlation'):
         feats.append(graycoprops(glcm, prop).mean())
 
-    # 3) LBP-гистограмма (uniform, P=8, R=1)
+    # 3) LBP histogram (uniform, P=8, R=1)
     lbp = local_binary_pattern(patchG, P=8, R=1, method='uniform')
     hist, _ = np.histogram(lbp.ravel(), bins=10, range=(0, 10), density=True)
     feats.extend(hist.tolist())
 
     return feats
 
-
-
-# При необходимости, обновите список имён признаков для вывода:
+# update feature names list for output if needed
 feature_names = [
     "mR","mG","mB","ExG","ExR","ExG-ExR",
     "haralick_contrast","haralick_correlation",
@@ -83,18 +78,16 @@ feature_names = [
 extract_features_cached = memory.cache(extract_features)
 
 def build_dataset(df_split: pd.DataFrame, n_jobs: int = -1, use_cache: bool = True):
-    """
-    Параллельно строит X и y.
-    - n_jobs: число процессов (используйте -1, чтобы взять все ядра).
-    - use_cache: держать ли кэш (True) или вызывать оригинальную функцию.
-    """
+    """Builds X and y in parallel.
+    - n_jobs: number of processes (use -1 to use all cores).
+    - use_cache: whether to use caching (True) or call the original function."""
     func = extract_features_cached if use_cache else extract_features
 
     paths = [str(BASE_DIR / p) for p in df_split.filepath]
-    # распараллеливаем: каждый процесс берёт свой набор путей
+    # parallelize: each process takes its own set of paths
     X = Parallel(
         n_jobs=n_jobs,
-        backend="loky",      # можно заменить на "threading" для IO-bound
+        backend="loky",      # can switch to "threading" for IO-bound tasks
         verbose=5
     )(delayed(func)(path) for path in paths)
 
@@ -103,10 +96,8 @@ def build_dataset(df_split: pd.DataFrame, n_jobs: int = -1, use_cache: bool = Tr
 
 
 def get_original_ids(relpaths):
-    """
-    Из списка относительных путей возвращает set of (class_name, patch_id),
-    где patch_id — имя исходного патча до аугментации.
-    """
+    """From a list of relative paths, returns a set of (class_name, patch_id) pairs,
+    where patch_id is the original patch name before augmentation."""
     ids = set()
     for rp in relpaths:
         parts = Path(rp).parts
@@ -122,15 +113,15 @@ def get_original_ids(relpaths):
 
 
 def main() -> None:
-    # 1) Читаем CSV
+    # 1) Read CSV
     df = pd.read_csv(LABELS_CSV)
 
-    # 2) Жёсткое разделение по префиксу пути
+    # 2) Strict split based on filepath prefix
     df_train = df[df.filepath.str.startswith("augmented_train/")].reset_index(drop=True)
     df_val   = df[df.filepath.str.startswith("augmented_validation/")].reset_index(drop=True)
     df_test  = df[df.filepath.str.startswith("augmented_test/")].reset_index(drop=True)
 
-    # 2.5) Smoke-tests на data-leak
+    # 2.5) Smoke tests for data leakage
     ids_train = get_original_ids(df_train.filepath)
     ids_val   = get_original_ids(df_val.filepath)
     ids_test  = get_original_ids(df_test.filepath)
@@ -141,27 +132,27 @@ def main() -> None:
 
     print(f"Train samples: {len(df_train)}, Validation: {len(df_val)}, Test: {len(df_test)}")
 
-    # 3) Строим фичи
-    print("Постройка фич train")
+    # 3) Build features
+    print("Building train features")
     X_train_f, y_train = build_dataset(df_train, n_jobs=-1, use_cache=True)
-    print("Постройка фич val")
+    print("Building validation features")
     X_val_f,   y_val   = build_dataset(df_val,   n_jobs=-1, use_cache=True)
-    print("Постройка фич test")
+    print("Building test features")
     X_test_f,  y_test  = build_dataset(df_test,  n_jobs=-1, use_cache=True)
 
     # 4) Manual class weights (no automatic balancing)
     classes = np.unique(y_train)
-    # задаём всем классам базовый вес = 1.0
+    # assign a base weight of 1.0 to all classes
     class_w = {c: 1.0 for c in classes}
 
-    # усиливаем берёзу (label=1) в 5 раз
+    # boost birch (label=1) by a factor
     boost_factor = 0.85
     if 1 in class_w:
         class_w[1] *= boost_factor
 
     print("Using manual class weights:", class_w, "\n")
 
-    # 5) Обучаем RandomForest с прогресс-баром
+    # 5) Train RandomForest with a progress bar
     print("Training RandomForest with progress bar:")
     clf = RandomForestClassifier(
         n_estimators=1,
@@ -175,17 +166,16 @@ def main() -> None:
         clf.n_estimators = i + 1
         clf.fit(X_train_f, y_train)
 
-    # 5.1) Собираем OOB-ошибки **на клоне**, чтобы не ломать `clf`
+    # 5.1) Collect OOB errors **on a clone** so as not to alter `clf`
     oob_errors = []
     for n in [1, 5, 10, 25, 50, 100, 150, 200, 300]:
-        temp = clone(clf)  # берём тот же набор параметров
+        temp = clone(clf)  # use the same set of parameters
         temp.set_params(n_estimators=n, warm_start=False)  # fresh forest
         temp.fit(X_train_f, y_train)
         oob_errors.append((n, 1 - temp.oob_score_))
     print("OOB errors by n_estimators:", oob_errors)
 
-
-    # 6) Опциональная кросс-валидация на train+validation
+    # 6) Optional cross-validation on train+validation
     X_tv_f = np.vstack([X_train_f, X_val_f])
     y_tv   = y_train + y_val
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_SEED)
@@ -195,26 +185,26 @@ def main() -> None:
     )
     print(f"\n5-fold CV Macro-F1 on train+val: {cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
 
-    # 7.1) Найдём порог для класса 1 на валидации
-    # бинаризуем y_val: 1 – берёза, 0 – всё остальное
+    # 7.1) Find threshold for class 1 on validation
+    # binarize y_val: 1 = birch, 0 = everything else
     y_val_bin = np.array(y_val) == 1
 
-    # вероятности «берёзы» на валидации
-    proba_val = clf.predict_proba(X_val_f)[:, 0]  # столбец 0 = класс 1
+    # probabilities for 'birch' on validation
+    proba_val = clf.predict_proba(X_val_f)[:, 0]  # column 0 corresponds to class 1
 
-    # считаем precision, recall и пороги
+    # compute precision, recall, and thresholds
     prec, rec, thresh = precision_recall_curve(y_val_bin, proba_val)
 
-    # высчитываем F1 для каждого порога
+    # calculate F1 for each threshold
     f1_scores = 2 * (prec * rec) / (prec + rec + 1e-12)
 
-    # выбираем индекс максимального F1 (пропускаем последний элемент prec/reс без порога)
+    # select the index of max F1 (skip last element of prec/rec without threshold)
     best_idx = np.argmax(f1_scores[:-1])
     best_thresh = thresh[best_idx]
     print(f"Best threshold for class 1: {best_thresh:.3f} → "
         f"Precision={prec[best_idx]:.3f}, Recall={rec[best_idx]:.3f}, F1={f1_scores[best_idx]:.3f}")
 
-    # 8) Оценка на тесте
+    # 8) Evaluation on the test set
     print("\n=== Test ===")
     yt_pred = clf.predict(X_test_f)
     print(classification_report(y_test, yt_pred, digits=3))
@@ -222,24 +212,24 @@ def main() -> None:
     print("Balanced accuracy (test):", balanced_accuracy_score(y_test, yt_pred))
     print("Cohen's kappa (test):", cohen_kappa_score(y_test, yt_pred))
 
-    # 8.1) Прогноз с порогом для класса 1
+    # 8.1) Prediction with threshold for class 1
     proba_test = clf.predict_proba(X_test_f)
 
     def predict_with_threshold(proba, t):
         y_pred = []
         for p in proba:
-            # если вероятность класса 1 >= t, то метка = 1
+            # if probability of class 1 >= t, assign label 1
             if p[0] >= t:
                 y_pred.append(1)
             else:
-                # иначе выбираем класс с наибольшей вероятностью среди остальных
-                other = np.argmax(p[1:]) + 2  # сдвиг, т.к. p[1:] → классы 2..6
+                # otherwise choose the class with highest probability among the rest
+                other = np.argmax(p[1:]) + 2  # shift because p[1:] maps to classes 2..6
                 y_pred.append(other)
         return y_pred
 
     y_test_adj = predict_with_threshold(proba_test, best_thresh)
 
-    # далее используем y_test_adj вместо clf.predict(X_test_f)
+    # then use y_test_adj instead of clf.predict(X_test_f)
     print(classification_report(y_test, y_test_adj, digits=3))
 
     # 9) ROC-AUC OvR
@@ -250,16 +240,16 @@ def main() -> None:
     auc = roc_auc_score(y_onehot, proba, multi_class="ovr")
     print(f"ROC-AUC (ovr) on test: {auc:.3f}")
 
-    # 10) Важность признаков
+    # 10) Feature importances
     print("\nFeature importances:")
     feature_names = [
-    "mR","mG","mB","ExG","ExR","ExG-ExR",
-    "haralick_contrast","haralick_correlation"
-] + [f"lbp_{i}" for i in range(10)]
+        "mR","mG","mB","ExG","ExR","ExG-ExR",
+        "haralick_contrast","haralick_correlation"
+    ] + [f"lbp_{i}" for i in range(10)]
     for name, imp in sorted(zip(feature_names, clf.feature_importances_), key=lambda x: -x[1]):
         print(f"  {name}: {imp:.3f}")
 
-    # 11) Сохраняем модель
+    # 11) Save the model
     out_model = "multiclass_main_without_data_leak_0.85weight_birch_300_trees_modified_8levels.pkl"
     joblib.dump(clf, out_model)
     print(f"\nModel saved as {out_model}")
