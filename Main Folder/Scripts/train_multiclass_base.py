@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 import os
 import pandas as pd
 import numpy as np
@@ -23,13 +20,13 @@ from tqdm import tqdm
 
 # --- Parameters -----------------------------------------------------------
 LABELS_CSV   = "labels_multiclass_all.csv"
-BASE_DIR     = Path("../Images/new_ver")   # тот же BASE_DIR, что и в генераторе CSV
+BASE_DIR     = Path("../Images/new_ver")   # the same BASE_DIR used in the CSV generator
 RANDOM_SEED  = 42
 N_TREES      = 300
 # -------------------------------------------------------------------------
 
 def extract_features(path: str) -> list[float]:
-    """Извлекает простые спектральные признаки из RGB-патча."""
+    """Extract simple spectral features from an RGB patch."""
     with rasterio.open(path) as src:
         img = src.read().astype(float)
     R, G, B = img[0], img[1], img[2]
@@ -41,7 +38,7 @@ def extract_features(path: str) -> list[float]:
 
 
 def build_dataset(df_split: pd.DataFrame):
-    """По датафрейму со столбцами 'filepath' и 'class' строит X (массив Nx6) и y."""
+    """Given a DataFrame with columns 'filepath' and 'class', builds X (an N×6 array) and y."""
     X, y = [], []
     for _, row in df_split.iterrows():
         full_path = BASE_DIR / row.filepath
@@ -52,10 +49,8 @@ def build_dataset(df_split: pd.DataFrame):
 
 
 def get_original_ids(relpaths):
-    """
-    Из списка относительных путей возвращает set of (class_name, patch_id),
-    где patch_id — имя исходного патча до аугментации.
-    """
+    """From a list of relative paths, returns a set of (class_name, patch_id) pairs,
+    where patch_id is the original patch name before augmentation."""
     ids = set()
     for rp in relpaths:
         parts = Path(rp).parts
@@ -71,15 +66,15 @@ def get_original_ids(relpaths):
 
 
 def main() -> None:
-    # 1) Читаем CSV
+    # 1) Read the CSV
     df = pd.read_csv(LABELS_CSV)
 
-    # 2) Жёсткое разделение по префиксу пути
+    # 2) Strict split based on filepath prefix
     df_train = df[df.filepath.str.startswith("augmented_train/")].reset_index(drop=True)
     df_val   = df[df.filepath.str.startswith("augmented_validation/")].reset_index(drop=True)
     df_test  = df[df.filepath.str.startswith("augmented_test/")].reset_index(drop=True)
 
-    # 2.5) Smoke-tests на data-leak
+    # 2.5) Smoke tests for data leakage
     ids_train = get_original_ids(df_train.filepath)
     ids_val   = get_original_ids(df_val.filepath)
     ids_test  = get_original_ids(df_test.filepath)
@@ -90,27 +85,27 @@ def main() -> None:
 
     print(f"Train samples: {len(df_train)}, Validation: {len(df_val)}, Test: {len(df_test)}")
 
-    # 3) Строим фичи
-    print("Постройка фич train")
+    # 3) Build features
+    print("Building train features")
     X_train_f, y_train = build_dataset(df_train)
-    print("Постройка фич val")
+    print("Building validation features")
     X_val_f,   y_val   = build_dataset(df_val)
-    print("Постройка фич test")
+    print("Building test features")
     X_test_f,  y_test  = build_dataset(df_test)
 
     # 4) Manual class weights (no automatic balancing)
     classes = np.unique(y_train)
-    # задаём всем классам базовый вес = 1.0
+    # assign a base weight of 1.0 to all classes
     class_w = {c: 1.0 for c in classes}
 
-    # усиливаем берёзу (label=1) в 5 раз
+    # boost birch (label=1) by a factor
     boost_factor = 0.85
     if 1 in class_w:
         class_w[1] *= boost_factor
 
     print("Using manual class weights:", class_w, "\n")
 
-    # 5) Обучаем RandomForest с прогресс-баром
+    # 5) Train RandomForest with progress bar
     print("Training RandomForest with progress bar:")
     clf = RandomForestClassifier(
         n_estimators=1,
@@ -124,17 +119,16 @@ def main() -> None:
         clf.n_estimators = i + 1
         clf.fit(X_train_f, y_train)
 
-    # 5.1) Собираем OOB-ошибки **на клоне**, чтобы не ломать `clf`
+    # 5.1) Collect OOB errors **on a clone** to avoid altering `clf`
     oob_errors = []
     for n in [1, 5, 10, 25, 50, 100, 150, 200, 300]:
-        temp = clone(clf)  # берём тот же набор параметров
+        temp = clone(clf)  # use the same set of parameters
         temp.set_params(n_estimators=n, warm_start=False)  # fresh forest
         temp.fit(X_train_f, y_train)
         oob_errors.append((n, 1 - temp.oob_score_))
     print("OOB errors by n_estimators:", oob_errors)
 
-
-    # 6) Опциональная кросс-валидация на train+validation
+    # 6) Optional cross-validation on train+validation
     X_tv_f = np.vstack([X_train_f, X_val_f])
     y_tv   = y_train + y_val
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_SEED)
@@ -144,26 +138,26 @@ def main() -> None:
     )
     print(f"\n5-fold CV Macro-F1 on train+val: {cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
 
-    # 7.1) Найдём порог для класса 1 на валидации
-    # бинаризуем y_val: 1 – берёза, 0 – всё остальное
+    # 7.1) Find threshold for class 1 on validation
+    # binarize y_val: 1 = birch, 0 = everything else
     y_val_bin = np.array(y_val) == 1
 
-    # вероятности «берёзы» на валидации
-    proba_val = clf.predict_proba(X_val_f)[:, 0]  # столбец 0 = класс 1
+    # probabilities for "birch" on validation
+    proba_val = clf.predict_proba(X_val_f)[:, 0]  # column 0 corresponds to class 1
 
-    # считаем precision, recall и пороги
+    # compute precision, recall, and thresholds
     prec, rec, thresh = precision_recall_curve(y_val_bin, proba_val)
 
-    # высчитываем F1 для каждого порога
+    # calculate F1 scores for each threshold
     f1_scores = 2 * (prec * rec) / (prec + rec + 1e-12)
 
-    # выбираем индекс максимального F1 (пропускаем последний элемент prec/reс без порога)
+    # skip the last element of prec/rec which has no threshold
     best_idx = np.argmax(f1_scores[:-1])
     best_thresh = thresh[best_idx]
     print(f"Best threshold for class 1: {best_thresh:.3f} → "
         f"Precision={prec[best_idx]:.3f}, Recall={rec[best_idx]:.3f}, F1={f1_scores[best_idx]:.3f}")
 
-    # 8) Оценка на тесте
+    # 8) Evaluation on the test set
     print("\n=== Test ===")
     yt_pred = clf.predict(X_test_f)
     print(classification_report(y_test, yt_pred, digits=3))
@@ -171,27 +165,27 @@ def main() -> None:
     print("Balanced accuracy (test):", balanced_accuracy_score(y_test, yt_pred))
     print("Cohen's kappa (test):", cohen_kappa_score(y_test, yt_pred))
 
-    # 8.1) Прогноз с порогом для класса 1
+    # 8.1) Prediction with threshold for class 1
     proba_test = clf.predict_proba(X_test_f)
 
     def predict_with_threshold(proba, t):
         y_pred = []
         for p in proba:
-            # если вероятность класса 1 >= t, то метка = 1
+            # if probability of class 1 >= t, assign label 1
             if p[0] >= t:
                 y_pred.append(1)
             else:
-                # иначе выбираем класс с наибольшей вероятностью среди остальных
-                other = np.argmax(p[1:]) + 2  # сдвиг, т.к. p[1:] → классы 2..6
+                # otherwise, choose the class with highest probability among others
+                other = np.argmax(p[1:]) + 2  # offset because p[1:] maps to classes 2..6
                 y_pred.append(other)
         return y_pred
 
     y_test_adj = predict_with_threshold(proba_test, best_thresh)
 
-    # далее используем y_test_adj вместо clf.predict(X_test_f)
+    # then use y_test_adj instead of clf.predict(X_test_f)
     print(classification_report(y_test, y_test_adj, digits=3))
 
-    # 9) ROC-AUC OvR
+    # 9) ROC-AUC One-vs-Rest
     proba = clf.predict_proba(X_test_f)
     y_onehot = np.zeros((len(y_test), clf.n_classes_))
     for i, lab in enumerate(y_test):
@@ -199,13 +193,13 @@ def main() -> None:
     auc = roc_auc_score(y_onehot, proba, multi_class="ovr")
     print(f"ROC-AUC (ovr) on test: {auc:.3f}")
 
-    # 10) Важность признаков
+    # 10) Feature importances
     print("\nFeature importances:")
     feature_names = ["mR","mG","mB","ExG","ExR","ExG-ExR"]
     for name, imp in sorted(zip(feature_names, clf.feature_importances_), key=lambda x: -x[1]):
         print(f"  {name}: {imp:.3f}")
 
-    # 11) Сохраняем модель
+    # 11) Save the model
     out_model = "multiclass_main_without_data_leak_0.85weight_birch.pkl"
     joblib.dump(clf, out_model)
     print(f"\nModel saved as {out_model}")
