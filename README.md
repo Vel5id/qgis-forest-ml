@@ -57,7 +57,7 @@ A script similar to the previous one, but uses the modified model and extended f
 [Citation]
 
 If you use this code or data in your research, please cite:
-Fominov V., et al. (2025) [add more authors]. Automated Detection of Birch Seedlings on Orthophotos Using Random Forest with Texture-Based Feature Engineering. [Journal, under review].
+Fominov V., et al. (2025) [add more authors]. [Name]. [Journal, under review].
 
 
 [Licens]
